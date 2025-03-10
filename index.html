@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nhận diện Webcam với TensorFlow.js</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-white flex flex-col items-center justify-center min-h-screen">
+    <h1 class="text-2xl font-bold mb-4">Nhận diện Webcam với TensorFlow.js</h1>
+    
+    <video id="webcam" autoplay playsinline class="border-4 border-blue-500 rounded-lg shadow-lg" width="400" height="300"></video>
+    
+    <p class="mt-4 text-lg"><strong>Kết quả:</strong> <span id="prediction" class="text-yellow-400">Đang tải model...</span></p>
+
+    <button id="captureBtn" class="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg shadow-md">📸 Chụp ảnh</button>
+    <canvas id="snapshotCanvas" width="400" height="300" class="hidden"></canvas>
+    
+    <audio id="notificationSound" src="https://www.soundjay.com/button/beep-07.wav"></audio>
+
+    <script>
+        async function setupWebcam() {
+            const webcamElement = document.getElementById("webcam");
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            webcamElement.srcObject = stream;
+            return new Promise((resolve) => {
+                webcamElement.onloadedmetadata = () => resolve();
+            });
+        }
+
+        async function loadModelAndPredict() {
+            const model = await mobilenet.load();
+            document.getElementById("prediction").innerText = "Model đã tải xong!";
+            console.log("Model MobileNet đã tải xong!");
+
+            const webcamElement = document.getElementById("webcam");
+            const sound = document.getElementById("notificationSound");
+            
+            let lastPrediction = "";
+
+            while (true) {
+                const predictions = await model.classify(webcamElement);
+                const resultText = `🎯 ${predictions[0].className} - 🔥 ${(predictions[0].probability * 100).toFixed(2)}%`;
+                document.getElementById("prediction").innerText = resultText;
+
+                // Nếu phát hiện một đối tượng mới, phát âm thanh
+                if (lastPrediction !== predictions[0].className) {
+                    sound.play();
+                    lastPrediction = predictions[0].className;
+                }
+
+                await tf.nextFrame(); // Chạy dự đoán liên tục
+            }
+        }
+
+        function captureImage() {
+            const video = document.getElementById("webcam");
+            const canvas = document.getElementById("snapshotCanvas");
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = canvas.toDataURL("image/png");
+
+            // Tạo link tải ảnh
+            const link = document.createElement("a");
+            link.href = imageData;
+            link.download = "capture.png";
+            link.click();
+        }
+
+        document.getElementById("captureBtn").addEventListener("click", captureImage);
+
+        async function run() {
+            await setupWebcam();
+            await loadModelAndPredict();
+        }
+
+        run();
+    </script>
+</body>
+</html>
